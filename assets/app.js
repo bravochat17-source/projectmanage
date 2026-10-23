@@ -161,40 +161,32 @@ const darken = (c, pct = 45) => `color-mix(in srgb, ${c} ${pct}%, #160d04)`;
 // ── HOUSES（原創徽記 · 非商標）────────────────────────────────────────────────
 const HOUSES = {
   serpent: {
-    label: '蛇紋（綠銀）',
-    primary: '#1c5038',
-    primaryDeep: '#0c2418',
-    metal: '#cdd4d6',
-    metalDeep: '#7f8a8d',
-    emblem: 'serpent',
-    aura: 'rgba(46,138,92,0.34)'
+    label: '綠色',
+    primary: '#178A50',
+    primaryDeep: '#178A50',
+    metal: '#178A50',
+    emblem: 'serpent'
   },
   eagle: {
-    label: '鷹紋（藍銅）',
-    primary: '#22376e',
-    primaryDeep: '#0e1c3e',
-    metal: '#c79a5b',
-    metalDeep: '#8a6a34',
-    emblem: 'eagle',
-    aura: 'rgba(74,116,205,0.32)'
+    label: '藍色',
+    primary: '#2F6BFF',
+    primaryDeep: '#2F6BFF',
+    metal: '#2F6BFF',
+    emblem: 'eagle'
   },
   badger: {
-    label: '獾紋（金黑）',
-    primary: '#2b2417',
-    primaryDeep: '#13100a',
-    metal: '#cba24c',
-    metalDeep: '#8a6e2a',
-    emblem: 'badger',
-    aura: 'rgba(203,162,76,0.3)'
+    label: '琥珀色',
+    primary: '#C27C0E',
+    primaryDeep: '#C27C0E',
+    metal: '#C27C0E',
+    emblem: 'badger'
   },
   lion: {
-    label: '獅紋（紅金）',
-    primary: '#5e1820',
-    primaryDeep: '#2c0a0e',
-    metal: '#d3aa50',
-    metalDeep: '#8a6a2a',
-    emblem: 'lion',
-    aura: 'rgba(211,170,80,0.3)'
+    label: '紫色',
+    primary: '#7A4DE0',
+    primaryDeep: '#7A4DE0',
+    metal: '#7A4DE0',
+    emblem: 'lion'
   }
 };
 const getHouse = u => HOUSES[u && u.house] || HOUSES.serpent;
@@ -217,6 +209,36 @@ const DEFAULT_USERS = [{
   role: '管理者',
   createdAt: now()
 }];
+const EVENT_KINDS = {
+  work: { label: '施工', hint: '工程正常進行' },
+  urgent: { label: '緊急', hint: '臨時採買、聯絡廠商等' },
+  scheduled: { label: '預定', hint: '丈量、驗收、約見等' }
+};
+const evKind = e => (e && EVENT_KINDS[e.kind]) ? e.kind : 'work';
+const CAT_COLORS = {
+  '拆除': '#9A6B4F', '冷氣': '#3B82C4', '水電': '#2A9D8F', '木工': '#C08A2E', '油漆': '#8A6FD1',
+  '系統櫃': '#4F6BED', '木地板': '#C2647A', '鐵件': '#5F6B7A', '玻璃': '#3BAFD9', '其他': '#8A919B'
+};
+const catColor = e => CAT_COLORS[e && e.category] || CAT_COLORS['其他'];
+const catLabel = e => e.category === '其他' ? e.customCategory || '其他' : e.category;
+// 事件詳細資訊：說明＋廠商／聯絡人＋電話
+function EventDetails({
+  ev,
+  clamp
+}) {
+  if (!ev || !(ev.details || ev.vendor || ev.phone)) return null;
+  const tel = (ev.phone || '').replace(/[^0-9+#]/g, '');
+  return /*#__PURE__*/React.createElement("div", {
+    className: `ev-details${clamp ? ' clamp' : ''}`
+  }, ev.details && /*#__PURE__*/React.createElement("p", {
+    className: "ev-details-text"
+  }, ev.details), (ev.vendor || ev.phone) && /*#__PURE__*/React.createElement("div", {
+    className: "ev-contact"
+  }, ev.vendor && /*#__PURE__*/React.createElement("span", null, "\u5EE0\u5546\uFF1A", ev.vendor), ev.phone && /*#__PURE__*/React.createElement("a", {
+    href: `tel:${tel}`,
+    onClick: e => e.stopPropagation()
+  }, "\u260E ", ev.phone)));
+}
 const CATEGORIES = ['拆除', '冷氣', '水電', '木工', '油漆', '系統櫃', '木地板', '鐵件', '玻璃', '其他'];
 const ROLES = ['管理者', '學生'];
 const isAdmin = u => !!u && u.role === '管理者';
@@ -341,6 +363,7 @@ function UserBadge({
 }) {
   const u = users.find(x => x.id === userId);
   if (!u) return null;
+  const hc = getHouse(u).primary;
   return /*#__PURE__*/React.createElement("span", {
     className: "user-badge",
     style: {
@@ -353,254 +376,47 @@ function UserBadge({
       width: 8,
       height: 8,
       borderRadius: '50%',
-      background: u.primaryColor,
+      background: hc,
       display: 'inline-block',
-      flexShrink: 0,
-      boxShadow: `0 0 0 1.5px ${u.secondaryColor}`
+      flexShrink: 0
     }
   }), u.name);
 }
 
-// ── HOUSE EMBLEM（使用者徽章圖 · 後備單線盾形）──────────────────────────────────
-function emblemImgFor(house) {
-  const found = Object.values(HOUSES).find(h => h.emblem === house);
-  return (window.__IMG || {})[house];
-}
+// ── USER ICON（簡易圓形圖示：代表色 + 名字首字）────────────────────────────────
 function HouseEmblem({
   house,
-  color = 'currentColor',
+  name,
   size = 28,
   className = ''
 }) {
-  const imgSrc = emblemImgFor(house);
-  if (imgSrc) {
-    return /*#__PURE__*/React.createElement("img", {
-      src: imgSrc,
+  const h = HOUSES[house] || HOUSES.serpent;
+  const letter = (name || '').trim().charAt(0).toUpperCase();
+  return /*#__PURE__*/React.createElement("span", {
+    className: `user-icon ${className}`,
+    "aria-hidden": "true",
+    style: {
       width: size,
       height: size,
-      className: `emblem-img ${className}`,
-      alt: "",
-      draggable: "false"
-    });
-  }
-  const shield = /*#__PURE__*/React.createElement("path", {
-    d: "M12 11Q12 8 15 8L49 8Q52 8 52 11L52 35Q52 55 32 66Q12 55 12 35Z",
+      fontSize: Math.round(size * 0.46),
+      background: `color-mix(in srgb, ${h.primary} 15%, transparent)`,
+      color: h.primary
+    }
+  }, letter || /*#__PURE__*/React.createElement("svg", {
+    width: Math.round(size * 0.56),
+    height: Math.round(size * 0.56),
+    viewBox: "0 0 24 24",
     fill: "none",
-    stroke: color,
-    strokeWidth: "2.1",
-    strokeLinejoin: "round"
-  });
-  const innerRule = /*#__PURE__*/React.createElement("path", {
-    d: "M16 13.5Q16 12 17.5 12L46.5 12Q48 12 48 13.5L48 34Q48 51 32 61Q16 51 16 34Z",
-    fill: "none",
-    stroke: color,
-    strokeWidth: "0.9",
-    strokeOpacity: "0.55",
-    strokeLinejoin: "round"
-  });
-  if (house === 'eagle') {
-    // 鷹（展翼·原創紋章）：頭冠、喙、層疊雙翼、尾羽、爪
-    return /*#__PURE__*/React.createElement("svg", {
-      className: className,
-      width: size,
-      height: Math.round(size * 1.12),
-      viewBox: "0 0 64 72",
-      fill: "none",
-      "aria-hidden": "true",
-      stroke: color,
-      strokeWidth: "1.7",
-      strokeLinecap: "round",
-      strokeLinejoin: "round"
-    }, shield, innerRule, /*#__PURE__*/React.createElement("path", {
-      d: "M32 17.6c2 0 3.4 1.5 3.4 3.4 0 1.2-.6 2.2-1.5 2.8l3.6 1.4-3.9.7",
-      fill: "none"
-    }), /*#__PURE__*/React.createElement("circle", {
-      cx: "32",
-      cy: "20.6",
-      r: "2.4",
-      fill: color,
-      stroke: "none"
-    }), /*#__PURE__*/React.createElement("path", {
-      d: "M32 24c-1.3 0-2.4.9-2.4 2.2 0 .8.4 1.5 1 1.9l-1.2 13.5L32 48l2.6-6.4-1.2-13.5c.6-.4 1-1.1 1-1.9 0-1.3-1.1-2.2-2.4-2.2z",
-      fill: color,
-      stroke: "none"
-    }), /*#__PURE__*/React.createElement("path", {
-      d: "M30.4 27.6c-6.4-3.2-12.8-3.4-18.4.2 3.8-.2 5.8 1 7 3.4 1.2-2 3-2.8 5.2-2.2-1.6 1.6-2 3.4-1 5.6 2-3 4.6-4 7.8-3.2z",
-      fill: color,
-      stroke: "none"
-    }), /*#__PURE__*/React.createElement("path", {
-      d: "M33.6 27.6c6.4-3.2 12.8-3.4 18.4.2-3.8-.2-5.8 1-7 3.4-1.2-2-3-2.8-5.2-2.2 1.6 1.6 2 3.4 1 5.6-2-3-4.6-4-7.8-3.2z",
-      fill: color,
-      stroke: "none"
-    }), /*#__PURE__*/React.createElement("path", {
-      d: "M31 33.4c-4.8-1.6-9.6-1-13.6 2.4 3-.4 4.8.4 6 2 .8-1.4 2.2-2 4-1.6-1.2 1.2-1.4 2.6-.6 4.2-1.4-2.2-3.4-3-5.8-3z",
-      fill: color,
-      stroke: "none",
-      opacity: "0.92"
-    }), /*#__PURE__*/React.createElement("path", {
-      d: "M33 33.4c4.8-1.6 9.6-1 13.6 2.4-3-.4-4.8.4-6 2-.8-1.4-2.2-2-4-1.6 1.2 1.2 1.4 2.6.6 4.2 1.4-2.2 3.4-3 5.8-3z",
-      fill: color,
-      stroke: "none",
-      opacity: "0.92"
-    }), /*#__PURE__*/React.createElement("path", {
-      d: "M28.8 45l3.2 4.6 3.2-4.6-3.2 2z",
-      fill: color,
-      stroke: "none"
-    }), /*#__PURE__*/React.createElement("path", {
-      d: "M29.6 49l-1.3 2.4M34.4 49l1.3 2.4",
-      strokeWidth: "1.3"
-    }), /*#__PURE__*/React.createElement("path", {
-      d: "M19.5 53.4l11.5-2.2 1 1 1-1 11.5 2.2v4l-11.5-1.9-1 .9-1-.9-11.5 1.9z",
-      fill: color,
-      stroke: "none"
-    }), /*#__PURE__*/React.createElement("path", {
-      d: "M32 52.2v4.3",
-      strokeWidth: "0.8",
-      stroke: "#0c0c0c",
-      strokeOpacity: "0.4"
-    }), /*#__PURE__*/React.createElement("path", {
-      d: "M23 53.6l6.4-1.1M41 53.6l-6.4-1.1",
-      strokeWidth: "0.7",
-      stroke: "#0c0c0c",
-      strokeOpacity: "0.28"
-    }));
-  }
-  if (house === 'badger') {
-    // 獸（坑姿侧面·條紋吻）
-    return /*#__PURE__*/React.createElement("svg", {
-      className: className,
-      width: size,
-      height: Math.round(size * 1.12),
-      viewBox: "0 0 64 72",
-      fill: "none",
-      "aria-hidden": "true",
-      stroke: color,
-      strokeWidth: "1.6",
-      strokeLinecap: "round",
-      strokeLinejoin: "round"
-    }, shield, innerRule, /*#__PURE__*/React.createElement("path", {
-      d: "M40 55c1.6-1.4 1-3.2-.2-4.6-1.8-2-2-5-1.4-8.4.8-4.6 1.4-8.6-1.2-11.4-2-2.2-5.4-2.8-8.4-1.4-3.8 1.8-5.8 6-6.2 11-.3 4 .2 8 1.6 10.4.8 1.4 1.4 3 .6 4.4z",
-      fill: color,
-      stroke: "none"
-    }), /*#__PURE__*/React.createElement("path", {
-      d: "M30 30c-3.4-.6-6.8.8-9.8 4l-3.4-1 2.2 3.4c-1 1.8-.4 3.6 1.4 4.6 2.8 1.6 6.6.6 8.8-2.2z",
-      fill: color,
-      stroke: "none"
-    }), /*#__PURE__*/React.createElement("path", {
-      d: "M19 35.5l6 2.6",
-      stroke: color,
-      strokeWidth: "2.4"
-    }), /*#__PURE__*/React.createElement("path", {
-      d: "M20 35l5.4 2.4",
-      stroke: "#0c0c0c",
-      strokeWidth: "1.4",
-      strokeOpacity: "0.4"
-    }), /*#__PURE__*/React.createElement("circle", {
-      cx: "25",
-      cy: "34.4",
-      r: "0.95",
-      fill: "#0c0c0c",
-      stroke: "none"
-    }), /*#__PURE__*/React.createElement("path", {
-      d: "M26 53.5l-1.4 2.6M30 53.5l-1.4 2.6M34 53.5l-1.4 2.6",
-      strokeWidth: "1.2"
-    }));
-  }
-  if (house === 'lion') {
-    // 獅（后立 rampant·朝左）
-    return /*#__PURE__*/React.createElement("svg", {
-      className: className,
-      width: size,
-      height: Math.round(size * 1.12),
-      viewBox: "0 0 64 72",
-      fill: "none",
-      "aria-hidden": "true",
-      stroke: color,
-      strokeWidth: "1.5",
-      strokeLinecap: "round",
-      strokeLinejoin: "round"
-    }, shield, innerRule, /*#__PURE__*/React.createElement("circle", {
-      cx: "26.5",
-      cy: "27",
-      r: "7",
-      fill: color,
-      stroke: "none"
-    }), /*#__PURE__*/React.createElement("path", {
-      d: "M19.6 24l-2.6-2M19 27.4l-3 .4M19.8 31l-2.6 2M26.5 19.8v-2.6M31.4 31l2.4 1.8",
-      strokeWidth: "1.3"
-    }), /*#__PURE__*/React.createElement("path", {
-      d: "M19.6 27.4l-3 .2 2.2 1.8z",
-      fill: color,
-      stroke: "none"
-    }), /*#__PURE__*/React.createElement("circle", {
-      cx: "24.5",
-      cy: "26",
-      r: "0.9",
-      fill: "#0c0c0c",
-      stroke: "none"
-    }), /*#__PURE__*/React.createElement("path", {
-      d: "M27.5 33.5c-3-1-6.4-2.6-8.8-5.6l1.8-1.8c2.2 2.6 4.8 3.8 7.6 3.8z",
-      fill: color,
-      stroke: "none"
-    }), /*#__PURE__*/React.createElement("path", {
-      d: "M27.4 33.5c-1.2 6.4 .8 13.4 6.4 20.2l4.6-2c-4.2-6-5.8-12-4.6-17.4z",
-      fill: color,
-      stroke: "none"
-    }), /*#__PURE__*/React.createElement("path", {
-      d: "M33.8 52c1.4 2.6 3.6 4.2 6.2 4.6l-.6-2.4c-1.8-.4-3.2-1.6-4-3z",
-      fill: color,
-      stroke: "none"
-    }), /*#__PURE__*/React.createElement("path", {
-      d: "M37.6 41c5.2-1.4 8.2 2.2 6.6 6.8l-2-.8c.5-2.2-.8-4-3.2-3.6z",
-      fill: color,
-      stroke: "none"
-    }), /*#__PURE__*/React.createElement("path", {
-      d: "M43.4 47.4l2.6 1.4-.6 3-2.6-2z",
-      fill: color,
-      stroke: "none"
-    }));
-  }
-  // 蛇（盤繞·原創紋章）：頭、信子、眼、S 雙曲身、捲尾、腹鱗
-  return /*#__PURE__*/React.createElement("svg", {
-    className: className,
-    width: size,
-    height: Math.round(size * 1.12),
-    viewBox: "0 0 64 72",
-    fill: "none",
-    "aria-hidden": "true",
-    stroke: color,
-    strokeWidth: "3.1",
-    strokeLinecap: "round",
-    strokeLinejoin: "round"
-  }, shield, innerRule, /*#__PURE__*/React.createElement("path", {
-    d: "M40 22C31 20 25 25 30 30C34 34 41 33 41 38C41 43 33 43 30 39C33 45 42 46 42 51C42 56 34 57 29 53",
-    strokeWidth: "3.2",
-    fill: "none"
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round"
+  }, /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "8",
+    r: "4"
   }), /*#__PURE__*/React.createElement("path", {
-    d: "M29 53c-3.4 1.4-7-.2-6.6-4",
-    strokeWidth: "2.4",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M34.5 29l-1.8 1.4M37 36l-2 .6M33 44l-1.8-1.2",
-    strokeWidth: "1",
-    strokeOpacity: "0.5"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M40 22c5.2-3.4 12-2.4 14.6 2.2-2.2 1-3.4 3-3.4 5.4-3-.4-5.4.6-8-.6-2.6-1.3-3.6-3.8-3.2-7z",
-    fill: color,
-    stroke: "none"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M50.6 28.6l1.6 2.6M47.6 29.2l1.2 2.6",
-    strokeWidth: "1.1"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M54 24.5l4.4-1M54 24.5l4.4 1.6",
-    strokeWidth: "1.5"
-  }), /*#__PURE__*/React.createElement("circle", {
-    cx: "46.8",
-    cy: "24.6",
-    r: "1.4",
-    fill: "#0c0c0c",
-    stroke: "none"
-  }));
+    d: "M4 21c0-4 3.6-6 8-6s8 2 8 6"
+  })));
 }
 
 // ── OWNER MARK（負責人盾形紋章）───────────────────────────────────────────────
@@ -618,7 +434,7 @@ function OwnerBookmark({
     className: `owner-crest${inline ? ' inline' : ''}`
   }, /*#__PURE__*/React.createElement(HouseEmblem, {
     house: h.emblem,
-    color: h.metal,
+    name: u.name,
     size: s
   }));
 }
@@ -634,7 +450,7 @@ function Toast({
   }, []);
   return /*#__PURE__*/React.createElement("div", {
     className: "toast"
-  }, "\u2726 ", msg);
+  }, msg);
 }
 
 // ── CHECKBOX ──────────────────────────────────────────────────────────────────
@@ -674,7 +490,7 @@ function ModalSheet({
     className: "modal-header"
   }, /*#__PURE__*/React.createElement("span", {
     className: "modal-title"
-  }, "\u269C ", title), /*#__PURE__*/React.createElement("button", {
+  }, title), /*#__PURE__*/React.createElement("button", {
     className: "close-btn",
     onClick: onClose
   }, "\u2715")), /*#__PURE__*/React.createElement("div", {
@@ -689,79 +505,470 @@ function MagicCalendar({
   calendarMonth,
   setCalendarMonth,
   calendarMap,
-  onSelectDate
+  onSelectDate,
+  selectedDate
 }) {
   const cells = getMonthDays(calendarMonth);
+  while (cells.length % 7) cells.push(null);
+  const weeks = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
   const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
   const todayKey = toDateKey(new Date());
+  const MAX_LANES = 3;
   const prevMonth = () => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1));
   const nextMonth = () => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1));
+  const goToday = () => setCalendarMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const renderWeek = (week, wi) => {
+    const keys = week.map(d => d ? toDateKey(d) : null);
+    // 這一週的施工事件 → 分配車道，畫成跨日橫條
+    const seen = {};
+    keys.forEach(k => {
+      if (!k) return;
+      ((calendarMap[k] || {}).events || []).forEach(ev => {
+        if (evKind(ev) === 'work') seen[ev.id] = ev;
+      });
+    });
+    const segs = Object.values(seen).map(ev => {
+      const cols = keys.map((k, i) => k && ((calendarMap[k] || {}).events || []).some(x => x.id === ev.id) ? i : -1).filter(i => i >= 0);
+      const st = ev.startDate || ev.date;
+      const en = ev.endDate || st;
+      return {
+        ev,
+        c0: cols[0],
+        c1: cols[cols.length - 1],
+        head: keys[cols[0]] === st,
+        tail: keys[cols[cols.length - 1]] === en
+      };
+    }).sort((x, y) => x.c0 - y.c0 || y.c1 - y.c0 - (x.c1 - x.c0));
+    const laneEnd = [];
+    segs.forEach(sg => {
+      let lane = laneEnd.findIndex(e => e < sg.c0);
+      if (lane === -1) lane = laneEnd.length;
+      laneEnd[lane] = sg.c1;
+      sg.lane = lane;
+    });
+    const lanesUsed = Math.min(MAX_LANES, laneEnd.length);
+    return /*#__PURE__*/React.createElement("div", {
+      key: wi,
+      className: "cal-week",
+      style: {
+        '--lanes': lanesUsed
+      }
+    }, week.map((day, i) => {
+      if (!day) return /*#__PURE__*/React.createElement("div", {
+        key: `e${i}`,
+        className: "cal-cell empty",
+        style: {
+          gridColumn: i + 1
+        }
+      });
+      const key = keys[i];
+      const dayData = calendarMap[key] || {};
+      const evs = dayData.events || [];
+      const memos = dayData.memos || [];
+      const urgents = evs.filter(ev => evKind(ev) === 'urgent' && !ev.completedAt);
+      const scheds = evs.filter(ev => evKind(ev) === 'scheduled' && !ev.completedAt);
+      const hidden = segs.filter(sg => sg.lane >= MAX_LANES && i >= sg.c0 && i <= sg.c1).length;
+      const isToday = key === todayKey;
+      return /*#__PURE__*/React.createElement("button", {
+        key: key,
+        type: "button",
+        className: `cal-cell${isToday ? ' today' : ''}${urgents.length ? ' has-urgent' : ''}${key === selectedDate ? ' selected' : ''}${i === 0 || i === 6 ? ' weekend' : ''}`,
+        style: {
+          gridColumn: i + 1
+        },
+        "aria-label": `${day.getMonth() + 1}/${day.getDate()}${evs.length ? `，${evs.length} 件事項` : ''}${urgents.length ? `，${urgents.length} 件緊急` : ''}`,
+        onClick: () => onSelectDate(key)
+      }, /*#__PURE__*/React.createElement("span", {
+        className: "cal-num"
+      }, day.getDate()), /*#__PURE__*/React.createElement("span", {
+        className: "cal-flags"
+      }, urgents.length > 0 && /*#__PURE__*/React.createElement("span", {
+        className: "cal-flag urgent"
+      }, "緊急", urgents.length > 1 ? ` ${urgents.length}` : ''), scheds.length > 0 && /*#__PURE__*/React.createElement("span", {
+        className: "cal-flag sched"
+      }, "預定", scheds.length > 1 ? ` ${scheds.length}` : ''), memos.length > 0 && /*#__PURE__*/React.createElement("span", {
+        className: "cal-flag memo"
+      }, "注意"), hidden > 0 && /*#__PURE__*/React.createElement("span", {
+        className: "cal-flag more"
+      }, "+", hidden, " 項施工")));
+    }), segs.filter(sg => sg.lane < MAX_LANES).map(sg => /*#__PURE__*/React.createElement("span", {
+      key: sg.ev.id,
+      className: `cal-bar${sg.head ? ' head' : ''}${sg.tail ? ' tail' : ''}${sg.ev.completedAt ? ' done' : ''}`,
+      style: {
+        gridColumn: `${sg.c0 + 1} / ${sg.c1 + 2}`,
+        gridRow: sg.lane + 2,
+        '--c': catColor(sg.ev)
+      },
+      title: `${catLabel(sg.ev)}｜${sg.ev.title}`
+    }, !sg.ev.title.includes(catLabel(sg.ev)) && /*#__PURE__*/React.createElement("b", null, catLabel(sg.ev), " "), sg.ev.title)));
+  };
   return /*#__PURE__*/React.createElement("div", {
     className: "parch-calendar"
   }, /*#__PURE__*/React.createElement("div", {
     className: "parch-cal-header"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "parch-cal-title"
+  }, calendarMonth.getFullYear(), " 年 ", calendarMonth.getMonth() + 1, " 月"), /*#__PURE__*/React.createElement("div", {
+    className: "cal-nav"
   }, /*#__PURE__*/React.createElement("button", {
     className: "btn btn-outline btn-sm",
-    style: {
-      color: 'var(--gold-dark)',
-      borderColor: 'var(--gold-dark)'
-    },
-    onClick: prevMonth
-  }, "\u2190"), /*#__PURE__*/React.createElement("div", {
-    className: "parch-cal-title"
-  }, calendarMonth.getFullYear(), " \u5E74 ", String(calendarMonth.getMonth() + 1).padStart(2, '0'), " \u6708"), /*#__PURE__*/React.createElement("button", {
+    onClick: goToday
+  }, "今天"), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-outline btn-sm",
-    style: {
-      color: 'var(--gold-dark)',
-      borderColor: 'var(--gold-dark)'
-    },
+    "aria-label": "上個月",
+    onClick: prevMonth
+  }, "←"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-outline btn-sm",
+    "aria-label": "下個月",
     onClick: nextMonth
-  }, "\u2192")), /*#__PURE__*/React.createElement("div", {
-    className: "parch-cal-grid"
-  }, weekdays.map(w => /*#__PURE__*/React.createElement("div", {
+  }, "→"))), /*#__PURE__*/React.createElement("div", {
+    className: "cal-weekdays"
+  }, weekdays.map((w, i) => /*#__PURE__*/React.createElement("span", {
     key: w,
-    className: "parch-cal-weekday"
-  }, w)), cells.map((day, idx) => {
-    if (!day) return /*#__PURE__*/React.createElement("div", {
-      key: `empty-${idx}`,
-      className: "parch-cal-day empty"
+    className: i === 0 || i === 6 ? 'weekend' : ''
+  }, w))), weeks.map(renderWeek));
+}
+
+// ── 工期表匯入（Excel 甘特表：每月一區塊、每列一工種、塗色＝施工日）──────────────
+const SCHED_SCHEDULED_WORDS = ['丈量', '驗收', '會勘', '放樣', '量測', '複丈', '估價', '交屋'];
+function scheduleCategory(name) {
+  const n = String(name || '');
+  const rules = [['木地板', '木地板'], ['系統櫃', '系統櫃'], ['木工', '木工'], ['木作', '木工'], ['空調', '冷氣'], ['冷氣', '冷氣'], ['水電', '水電'], ['油漆', '油漆'], ['玻璃', '玻璃'], ['鐵件', '鐵件'], ['鐵工', '鐵件'], ['拆除', '拆除']];
+  for (const [k, c] of rules) if (n.includes(k)) return { category: c, customCategory: '' };
+  return { category: '其他', customCategory: n.replace(/工程$/, '') || '其他' };
+}
+function parseScheduleWorkbook(wb) {
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  if (!ws || !ws['!ref']) throw new Error('讀不到工作表內容');
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  const cell = (r, c) => ws[XLSX.utils.encode_cell({ r, c })];
+  const text = (r, c) => {
+    const x = cell(r, c);
+    return x && x.t === 's' ? String(x.v).trim() : '';
+  };
+  const fill = (r, c) => {
+    const x = cell(r, c);
+    const s = x && x.s;
+    if (!s || s.patternType !== 'solid' || !s.fgColor || !s.fgColor.rgb) return null;
+    const rgb = String(s.fgColor.rgb).slice(-6).toUpperCase();
+    return rgb === 'FFFFFF' ? null : rgb;
+  };
+  const pad = n => String(n).padStart(2, '0');
+  const serialToKey = v => {
+    const d = XLSX.SSF.parse_date_code(v);
+    return d ? `${d.y}-${pad(d.m)}-${pad(d.d)}` : null;
+  };
+  const addYear = key => `${Number(key.slice(0, 4)) + 1}${key.slice(4)}`;
+  const mergeText = (r, c) => {
+    const m = (ws['!merges'] || []).find(m => r >= m.s.r && r <= m.e.r && c >= m.s.c && c <= m.e.c);
+    return m ? text(m.s.r, m.s.c) : text(r, c);
+  };
+  let title = '';
+  const blocks = [];
+  let cur = null;
+  for (let r = range.s.r; r <= range.e.r; r++) {
+    // 日期列：同一列有 7 格以上的日期序號
+    const dateCols = {};
+    let count = 0;
+    for (let c = 1; c <= range.e.c; c++) {
+      const x = cell(r, c);
+      if (x && x.t === 'n' && x.v > 30000 && x.v < 80000) {
+        const k = serialToKey(x.v);
+        if (k) { dateCols[c] = k; count++; }
+      }
+    }
+    if (count >= 7) {
+      cur = { dateCols, rows: [], holidayRows: [], weekendCols: new Set() };
+      blocks.push(cur);
+      continue;
+    }
+    const head = text(r, 0);
+    if (!cur) {
+      if (head && !title) title = head.replace(/[-－]?\s*室內工程進度表$|[-－]?\s*工程進度表$|[-－]?\s*進度表$/, '');
+      continue;
+    }
+    if (head === '工種') {
+      Object.keys(cur.dateCols).forEach(c => {
+        const w = text(r, Number(c));
+        if (w === '六' || w === '日') cur.weekendCols.add(Number(c));
+      });
+      continue;
+    }
+    if (!head) {
+      // 沒有工種名稱、但有塗色的列＝假日列（例如「雙十連假」）
+      const cols = Object.keys(cur.dateCols).map(Number).filter(c => fill(r, c));
+      if (cols.length) cur.holidayRows.push({ r, cols });
+      continue;
+    }
+    cur.rows.push(r);
+  }
+  if (!blocks.length) throw new Error('找不到日期列，請確認是工期表格式');
+  // 區塊日期若比上一區塊早（年份沒改），自動往後補一年
+  let lastKey = '';
+  blocks.forEach(b => {
+    let keys = Object.values(b.dateCols);
+    let guard = 0;
+    while (lastKey && keys[0] <= lastKey && guard++ < 5) {
+      Object.keys(b.dateCols).forEach(c => { b.dateCols[c] = addYear(b.dateCols[c]); });
+      keys = Object.values(b.dateCols);
+    }
+    lastKey = keys[keys.length - 1];
+  });
+  // 非工作日（週末、連假）與假日名稱
+  const offDays = new Set();
+  const holidays = {};
+  blocks.forEach(b => {
+    b.weekendCols.forEach(c => b.dateCols[c] && offDays.add(b.dateCols[c]));
+    b.holidayRows.forEach(h => h.cols.forEach(c => {
+      const k = b.dateCols[c];
+      if (!k) return;
+      offDays.add(k);
+      const name = mergeText(h.r, c);
+      if (name) holidays[k] = name;
+    }));
+  });
+  // 每個工種的施工日
+  const trades = {};
+  blocks.forEach(b => b.rows.forEach(r => {
+    const name = text(r, 0);
+    const nameFill = fill(r, 0);
+    Object.entries(b.dateCols).forEach(([c, key]) => {
+      c = Number(c);
+      const f = fill(r, c);
+      const note = text(r, c);
+      const on = f && f !== 'DDDDDD';
+      if (!on) return;
+      (trades[name] = trades[name] || {})[key] = note || (trades[name][key] || '');
     });
-    const key = toDateKey(day);
-    const dayData = calendarMap[key] || {
-      events: [],
-      memos: []
-    };
-    const evs = dayData.events || [];
-    const memos = dayData.memos || [];
-    const isToday = key === todayKey;
-    const calLabels = [];
-    evs.forEach(ev => {
-      const evStart = ev.startDate || ev.date;
-      const info = eventUrgencyInfo(evStart, ev.completedAt);
-      const cat = ev.category === '其他' ? ev.customCategory || '其他' : ev.category;
-      const label = `${cat}｜${ev.title}`;
-      if (!calLabels.some(x => x.key === ev.id)) calLabels.push({
-        key: ev.id,
-        label,
-        status: info.status
+  }));
+  const dayAfter = key => {
+    const d = parseDateOnly(key);
+    d.setDate(d.getDate() + 1);
+    return toDateKey(d);
+  };
+  const md = k => `${Number(k.slice(5, 7))}/${Number(k.slice(8, 10))}`;
+  const runsText = days => {
+    const runs = [];
+    days.forEach(k => {
+      const last = runs[runs.length - 1];
+      if (last && dayAfter(last[1]) === k) last[1] = k; else runs.push([k, k]);
+    });
+    return runs.map(([a, b]) => a === b ? md(a) : `${md(a)}–${md(b)}`).join('、');
+  };
+  const events = [];
+  Object.entries(trades).forEach(([name, dayMap]) => {
+    const days = Object.keys(dayMap).sort();
+    const groups = [];
+    days.forEach(k => {
+      const g = groups[groups.length - 1];
+      if (g) {
+        // 中間只隔週末／連假就視為同一段工程
+        let x = dayAfter(g.days[g.days.length - 1]);
+        let onlyOff = true;
+        let guard = 0;
+        while (x < k && guard++ < 40) {
+          if (!offDays.has(x)) { onlyOff = false; break; }
+          x = dayAfter(x);
+        }
+        // 有新的文字備註（例如「收尾」）時另開一段
+        if (onlyOff && !(dayMap[k] && dayMap[k] !== g.notes[g.notes.length - 1])) {
+          g.days.push(k);
+          if (dayMap[k] && !g.notes.includes(dayMap[k])) g.notes.push(dayMap[k]);
+          return;
+        }
+      }
+      groups.push({ days: [k], notes: dayMap[k] ? [dayMap[k]] : [] });
+    });
+    groups.forEach(g => {
+      const st = g.days[0];
+      const en = g.days[g.days.length - 1];
+      const cat = scheduleCategory(name);
+      const note = g.notes.join('、');
+      const isSched = SCHED_SCHEDULED_WORDS.some(w => note.includes(w));
+      const offIn = Object.entries(holidays).filter(([k]) => k >= st && k <= en).map(([k, n]) => `${md(k)} ${n}`);
+      const detailLines = [`施工日：${runsText(g.days)}（共 ${g.days.length} 天）`];
+      if (offIn.length) detailLines.push(`期間假日：${[...new Set(offIn)].join('、')}`);
+      events.push({
+        trade: name,
+        title: note && !name.includes(note) ? `${name}－${note}` : name,
+        kind: isSched ? 'scheduled' : 'work',
+        category: cat.category,
+        customCategory: cat.customCategory,
+        startDate: st,
+        endDate: en,
+        workDays: g.days.length,
+        details: detailLines.join('\n')
       });
     });
-    const hasUrgent = calLabels.some(x => x.status === 'red' || x.status === 'darkred');
-    return /*#__PURE__*/React.createElement("div", {
-      key: key,
-      className: `parch-cal-day${isToday ? ' today' : ''}${hasUrgent ? ' has-urgent' : ''}`,
-      onClick: () => onSelectDate(key)
-    }, memos.length > 0 && /*#__PURE__*/React.createElement("div", {
-      className: "cal-memo-dot"
-    }, "\u2711"), /*#__PURE__*/React.createElement("div", {
-      className: "parch-cal-date"
-    }, day.getDate()), calLabels.slice(0, 2).map(item => /*#__PURE__*/React.createElement("span", {
-      key: item.key,
-      className: `cal-chip ev-${item.status}`
-    }, item.label)), calLabels.length > 2 && /*#__PURE__*/React.createElement("div", {
-      className: "cal-more"
-    }, "+", calLabels.length - 2));
+  });
+  events.sort((a, b) => a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : a.title.localeCompare(b.title));
+  return { title, events, holidays };
+}
+
+// 匯入預覽視窗
+function ScheduleImport({
+  result,
+  existing,
+  users,
+  currentUser,
+  onCancel,
+  onImport
+}) {
+  const md = k => `${Number(k.slice(5, 7))}/${Number(k.slice(8, 10))}`;
+  const isDup = ev => existing.some(x => x.title === ev.title && (x.startDate || x.date) === ev.startDate && (x.endDate || x.startDate || x.date) === ev.endDate);
+  const [checked, setChecked] = useState(() => result.events.map(ev => !isDup(ev)));
+  const [executorId, setExecutorId] = useState(currentUser.id);
+  const n = checked.filter(Boolean).length;
+  const first = result.events[0], last = result.events[result.events.length - 1];
+  const toggle = i => setChecked(c => c.map((v, j) => j === i ? !v : v));
+  return /*#__PURE__*/React.createElement(ModalSheet, {
+    title: "匯入工期表",
+    onClose: onCancel,
+    footer: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-outline",
+      onClick: onCancel
+    }, "取消"), /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-gold",
+      disabled: n === 0,
+      onClick: () => onImport(result.events.filter((_, i) => checked[i]), executorId)
+    }, `匯入 ${n} 項`))
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "imp-summary"
+  }, result.title ? `「${result.title}」` : '', "找到 ", result.events.length, " 項工程", first ? `，${md(first.startDate)} – ${md(result.events.reduce((m, e) => e.endDate > m ? e.endDate : m, first.endDate))}` : ''), /*#__PURE__*/React.createElement("p", {
+    className: "imp-hint"
+  }, "中間只隔週末或連假的會合併成同一段，實際施工日寫在詳細說明。含「丈量」等字的會標為預定。"), /*#__PURE__*/React.createElement("div", {
+    className: "field-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "field-label"
+  }, "執行者（全部套用，匯入後可個別修改）"), /*#__PURE__*/React.createElement("select", {
+    className: "field-select",
+    value: executorId,
+    onChange: e => setExecutorId(e.target.value)
+  }, users.map(u => /*#__PURE__*/React.createElement("option", {
+    key: u.id,
+    value: u.id
+  }, u.name)))), /*#__PURE__*/React.createElement("div", {
+    className: "imp-list"
+  }, result.events.map((ev, i) => {
+    const dup = isDup(ev);
+    return /*#__PURE__*/React.createElement("label", {
+      key: i,
+      className: `imp-row${checked[i] ? '' : ' off'}`,
+      style: {
+        '--cat': catColor(ev)
+      }
+    }, /*#__PURE__*/React.createElement("input", {
+      type: "checkbox",
+      checked: checked[i],
+      onChange: () => toggle(i)
+    }), /*#__PURE__*/React.createElement("span", {
+      className: "imp-line"
+    }), /*#__PURE__*/React.createElement("span", {
+      className: "imp-main"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "imp-title"
+    }, ev.title, ev.kind === 'scheduled' && /*#__PURE__*/React.createElement("span", {
+      className: "imp-tag sched"
+    }, "預定"), dup && /*#__PURE__*/React.createElement("span", {
+      className: "imp-tag dup"
+    }, "已存在")), /*#__PURE__*/React.createElement("span", {
+      className: "imp-meta"
+    }, ev.startDate === ev.endDate ? md(ev.startDate) : `${md(ev.startDate)} – ${md(ev.endDate)}`, "　施工 ", ev.workDays, " 天")));
   })));
+}
+
+// ── 單日放大檢視（點月曆日期後跳出）──────────────────────────────────────────
+function DaySheet({
+  dateKey,
+  dayData,
+  users,
+  onClose,
+  onView,
+  onComplete,
+  canEdit
+}) {
+  const evs = dayData && dayData.events || [];
+  const memos = dayData && dayData.memos || [];
+  const d = parseDateOnly(dateKey);
+  const wk = ['日', '一', '二', '三', '四', '五', '六'][d ? d.getDay() : 0];
+  const md = iso => {
+    const x = parseDateOnly(iso);
+    return x ? `${x.getMonth() + 1}/${x.getDate()}` : '';
+  };
+  const dayIndex = (st, en) => {
+    const a = parseDateOnly(st), b = parseDateOnly(en), c = d;
+    if (!a || !b || !c) return '';
+    const total = Math.round((b - a) / 86400000) + 1;
+    const n = Math.round((c - a) / 86400000) + 1;
+    return total > 1 ? `第 ${n} 天／共 ${total} 天` : '';
+  };
+  const order = { urgent: 0, scheduled: 1, work: 2 };
+  const sorted = [...evs].sort((x, y) => (x.completedAt ? 1 : 0) - (y.completedAt ? 1 : 0) || order[evKind(x)] - order[evKind(y)]);
+  const total = evs.length + memos.length;
+  const item = ev => {
+    const kind = evKind(ev);
+    const st = ev.startDate || ev.date;
+    const en = ev.endDate || st;
+    const notes = (ev.contentEntries || []).filter(c => c.date === dateKey && c.content);
+    return /*#__PURE__*/React.createElement("div", {
+      key: ev.id,
+      className: `day-item kind-${kind}${ev.completedAt ? ' is-done' : ''}`,
+      style: {
+        '--cat': catColor(ev)
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "day-item-top"
+    }, kind === 'work' ? /*#__PURE__*/React.createElement("span", {
+      className: "day-item-line"
+    }) : /*#__PURE__*/React.createElement("span", {
+      className: `day-item-flag kind-${kind}`
+    }, EVENT_KINDS[kind].label), /*#__PURE__*/React.createElement("span", {
+      className: "day-item-title"
+    }, ev.title), ev.completedAt && /*#__PURE__*/React.createElement("span", {
+      className: "day-item-done"
+    }, "\u5DF2\u5B8C\u6210")), /*#__PURE__*/React.createElement("div", {
+      className: "day-item-meta"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "tag-type"
+    }, catLabel(ev)), /*#__PURE__*/React.createElement("span", null, st === en ? md(st) : `${md(st)} – ${md(en)}`), dayIndex(st, en) && /*#__PURE__*/React.createElement("span", null, dayIndex(st, en)), /*#__PURE__*/React.createElement(UserBadge, {
+      userId: ev.executorId,
+      users: users
+    })), /*#__PURE__*/React.createElement(EventDetails, {
+      ev: ev
+    }), notes.length > 0 && /*#__PURE__*/React.createElement("div", {
+      className: "day-item-notes"
+    }, notes.map(c => /*#__PURE__*/React.createElement("p", {
+      key: c.id
+    }, c.content))), /*#__PURE__*/React.createElement("div", {
+      className: "day-item-actions"
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-outline btn-sm",
+      onClick: () => onView(ev)
+    }, "\u8A73\u60C5"), canEdit && /*#__PURE__*/React.createElement("button", {
+      className: "btn btn-outline btn-sm",
+      onClick: () => onComplete(ev)
+    }, ev.completedAt ? '\u53D6\u6D88\u5B8C\u6210' : '\u2713 \u5B8C\u6210')));
+  };
+  return /*#__PURE__*/React.createElement(ModalSheet, {
+    title: d ? `${d.getMonth() + 1} 月 ${d.getDate()} 日（${wk}）・${total} 件` : dateKey,
+    onClose: onClose
+  }, total === 0 && /*#__PURE__*/React.createElement("div", {
+    className: "day-empty"
+  }, "\u9019\u5929\u6C92\u6709\u5B89\u6392\u4E8B\u9805"), /*#__PURE__*/React.createElement("div", {
+    className: "day-list"
+  }, sorted.map(item), memos.map(m => /*#__PURE__*/React.createElement("div", {
+    key: m.id,
+    className: "day-item kind-memo"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "day-item-top"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "day-item-flag kind-memo"
+  }, "\u6CE8\u610F"), /*#__PURE__*/React.createElement("span", {
+    className: "day-item-title"
+  }, m.title)), m.content && /*#__PURE__*/React.createElement("div", {
+    className: "day-item-notes"
+  }, /*#__PURE__*/React.createElement("p", null, m.content))))));
 }
 
 // ── IDENTITY SCREEN ───────────────────────────────────────────────────────────
@@ -826,7 +1033,7 @@ function IdentityScreen({
     }
   }, /*#__PURE__*/React.createElement("div", {
     className: "crest-mark"
-  }, "\u269C"), /*#__PURE__*/React.createElement("h1", {
+  }, "\u5DE5"), /*#__PURE__*/React.createElement("h1", {
     className: "crest-title"
   }, "\u5DE5\u7A0B\u6A94\u6848\u5EAB"), /*#__PURE__*/React.createElement("p", {
     className: "crest-subtitle"
@@ -836,15 +1043,12 @@ function IdentityScreen({
       key: u.id,
       className: "user-card",
       onClick: () => pickUser(u),
-      style: {
-        background: `linear-gradient(155deg, color-mix(in srgb, ${h.primary} 30%, #15151b), #15151b)`
-      }
     }, /*#__PURE__*/React.createElement("span", {
       className: "id-crest"
     }, /*#__PURE__*/React.createElement(HouseEmblem, {
       house: h.emblem,
-      color: h.metal,
-      size: 66
+      name: u.name,
+      size: 52
     })), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
@@ -862,15 +1066,11 @@ function IdentityScreen({
     onClick: () => setShowAdd(true)
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      fontSize: '1.5rem',
-      color: 'var(--gold)'
+      fontSize: '1.2rem'
     }
   }, "\uFF0B"), /*#__PURE__*/React.createElement("span", {
     style: {
-      fontFamily: "'Cinzel','Noto Serif TC',serif",
-      color: 'var(--gold-light)',
-      fontSize: '0.95rem',
-      marginLeft: '0.5rem'
+      marginLeft: '0.4rem'
     }
   }, "\u65B0\u589E\u4F7F\u7528\u8005")), pendingAdmin && /*#__PURE__*/React.createElement(ModalSheet, {
     title: `管理者登入 · ${pendingAdmin.name}`,
@@ -887,7 +1087,7 @@ function IdentityScreen({
     className: "flex items-center justify-center gap-3 mb-3"
   }, /*#__PURE__*/React.createElement(HouseEmblem, {
     house: getHouse(pendingAdmin).emblem,
-    color: getHouse(pendingAdmin).metal,
+    name: pendingAdmin.name,
     size: 52
   })), /*#__PURE__*/React.createElement("div", {
     className: "field-group"
@@ -950,7 +1150,7 @@ function IdentityScreen({
     className: "field-group"
   }, /*#__PURE__*/React.createElement("label", {
     className: "field-label"
-  }, "\u8B58\u5225\u5716\u9A30"), /*#__PURE__*/React.createElement("select", {
+  }, "\u4EE3\u8868\u8272"), /*#__PURE__*/React.createElement("select", {
     className: "field-select",
     value: form.house,
     onChange: e => setForm({
@@ -964,12 +1164,10 @@ function IdentityScreen({
     className: "flex items-center justify-center gap-3 mt-2"
   }, /*#__PURE__*/React.createElement("span", {
     className: "text-xs text-mute"
-  }, "\u5716\u9A30\u9810\u89BD\uFF1A"), /*#__PURE__*/React.createElement(HouseEmblem, {
+  }, "\u9810\u89BD\uFF1A"), /*#__PURE__*/React.createElement(HouseEmblem, {
     house: form.house,
-    color: getHouse({
-      house: form.house
-    }).metal,
-    size: 48
+    name: form.name,
+    size: 40
   }))));
 }
 
@@ -995,11 +1193,7 @@ function HomeScreen({
   });
   const getStats = pid => {
     const evs = events.filter(e => e.projectId === pid && !e.deletedAt);
-    const urgent = evs.filter(e => {
-      if (e.completedAt) return false;
-      const info = eventUrgencyInfo(e.startDate || e.date, e.completedAt);
-      return info.status === 'red' || info.status === 'darkred';
-    }).length;
+    const urgent = evs.filter(e => !e.completedAt && evKind(e) === 'urgent').length;
     return {
       total: evs.length,
       undone: evs.filter(e => !e.completedAt).length,
@@ -1040,19 +1234,14 @@ function HomeScreen({
       className: `project-book${closed ? ' is-closed' : ''}${urgent ? ' is-urgent' : ''}`,
       onClick: () => onOpenProject(p),
       style: {
-        '--cover': h.primary,
-        '--cover-deep': h.primaryDeep,
-        '--spine': h.metal,
-        borderWidth: "1px 1px 1px 20px",
-        borderRadius: "9px 10px 9px 9px"
+        '--bar': h.primary
       }
-    }, /*#__PURE__*/React.createElement(OwnerBookmark, {
-      userId: p.mainOwnerId,
-      users: users,
-      size: 58
-    }), /*#__PURE__*/React.createElement("span", {
-      className: "book-house-tag"
-    }, owner ? owner.name : ''), /*#__PURE__*/React.createElement("div", {
+    }, owner && /*#__PURE__*/React.createElement("span", {
+      className: "book-owner"
+    }, /*#__PURE__*/React.createElement(UserBadge, {
+      userId: owner.id,
+      users: users
+    })), /*#__PURE__*/React.createElement("div", {
       className: "book-title"
     }, p.name), /*#__PURE__*/React.createElement("div", {
       className: "book-meta"
@@ -1060,7 +1249,7 @@ function HomeScreen({
       className: "badge-urgent"
     }, /*#__PURE__*/React.createElement("span", {
       className: "flame"
-    }, "\uD83D\uDD25"), "\u7DCA\u6025 ", stats.urgent), /*#__PURE__*/React.createElement("span", {
+    }, ""), "\u7DCA\u6025 ", stats.urgent), /*#__PURE__*/React.createElement("span", {
       className: `pill ${statusClass(p.status)}`
     }, PROJECT_STATUSES[p.status]), !closed && stats.undone > 0 && /*#__PURE__*/React.createElement("span", {
       className: "pill pill-undone"
@@ -1075,10 +1264,8 @@ function HomeScreen({
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: "header-title"
-  }, "\u269C \u5DE5\u7A0B\u6A94\u6848\u5EAB"), /*#__PURE__*/React.createElement("div", {
-    className: "header-subtitle"
-  }, "\u5DE5\u7A0B\u6848\u4EF6\u7BA1\u7406\u7CFB\u7D71")), /*#__PURE__*/React.createElement("div", {
+    className: "header-title brand"
+  }, "\u5DE5\u7A0B\u6A94\u6848\u5EAB")), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-2"
   }, /*#__PURE__*/React.createElement(UserBadge, {
     userId: currentUser.id,
@@ -1223,7 +1410,7 @@ function HomeScreen({
       }
     }, /*#__PURE__*/React.createElement(HouseEmblem, {
       house: h.emblem,
-      color: h.metal,
+      name: u.name,
       size: 30
     })), /*#__PURE__*/React.createElement("div", {
       style: {
@@ -1232,7 +1419,6 @@ function HomeScreen({
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
-        fontFamily: "'Cinzel','Noto Serif TC',serif",
         fontWeight: 700,
         color: 'var(--ink)'
       }
@@ -1263,6 +1449,10 @@ function EventForm({
   const initEndDate = initial?.endDate || initial?.startDate || initial?.date || '';
   const [form, setForm] = useState({
     title: initial?.title || '',
+    kind: initial?.kind || 'work',
+    details: initial?.details || '',
+    vendor: initial?.vendor || '',
+    phone: initial?.phone || '',
     category: initial?.category || '木工',
     customCategory: initial?.customCategory || '',
     executorId: initial?.executorId || currentUser.id,
@@ -1315,6 +1505,10 @@ function EventForm({
       endDate: safeEnd,
       date: form.startDate,
       title: form.title.trim(),
+      kind: form.kind,
+      details: (form.details || '').trim(),
+      vendor: (form.vendor || '').trim(),
+      phone: (form.phone || '').trim(),
       category: form.category,
       customCategory: form.customCategory,
       executorId: form.executorId,
@@ -1377,6 +1571,56 @@ function EventForm({
     className: "field-group"
   }, /*#__PURE__*/React.createElement("label", {
     className: "field-label"
+  }, "\u4E8B\u4EF6\u6027\u8CEA"), /*#__PURE__*/React.createElement("div", {
+    className: "kind-picker",
+    role: "radiogroup"
+  }, Object.entries(EVENT_KINDS).map(([k, v]) => /*#__PURE__*/React.createElement("button", {
+    key: k,
+    type: "button",
+    role: "radio",
+    "aria-checked": form.kind === k,
+    className: `kind-opt kind-${k}${form.kind === k ? ' on' : ''}`,
+    onClick: () => f('kind', k)
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "kind-opt-label"
+  }, v.label), /*#__PURE__*/React.createElement("span", {
+    className: "kind-opt-hint"
+  }, v.hint))))), /*#__PURE__*/React.createElement("div", {
+    className: "field-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "field-label"
+  }, "\u8A73\u7D30\u8AAA\u660E"), /*#__PURE__*/React.createElement("textarea", {
+    className: "field-textarea",
+    rows: 4,
+    value: form.details,
+    onChange: e => f('details', e.target.value),
+    placeholder: form.kind === 'urgent' ? '\u4F8B\uFF1A\u8981\u8CB7\u4EC0\u9EBC\u3001\u898F\u683C\u6578\u91CF\u3001\u4F55\u6642\u8981\u5230\u73FE\u5834' : form.kind === 'scheduled' ? '\u4F8B\uFF1A\u6642\u9593\u3001\u5730\u9EDE\u3001\u8981\u6E96\u5099\u7684\u6771\u897F' : '\u4F8B\uFF1A\u65BD\u5DE5\u7BC4\u570D\u3001\u6750\u6599\u898F\u683C\u3001\u6CE8\u610F\u4E8B\u9805'
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "date-row"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "field-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "field-label"
+  }, "\u5EE0\u5546\uFF0F\u806F\u7D61\u4EBA"), /*#__PURE__*/React.createElement("input", {
+    className: "field-input",
+    value: form.vendor,
+    onChange: e => f('vendor', e.target.value),
+    placeholder: "\u9078\u586B"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "field-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "field-label"
+  }, "\u96FB\u8A71"), /*#__PURE__*/React.createElement("input", {
+    className: "field-input",
+    type: "tel",
+    inputMode: "tel",
+    value: form.phone,
+    onChange: e => f('phone', e.target.value),
+    placeholder: "\u9078\u586B"
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "field-group"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "field-label"
   }, "\u5DE5\u7A0B\u985E\u578B"), /*#__PURE__*/React.createElement("select", {
     className: "field-select",
     value: form.category,
@@ -1409,7 +1653,7 @@ function EventForm({
     className: "event-content-editor-heading"
   }, /*#__PURE__*/React.createElement("label", {
     className: "field-label"
-  }, "\u4E8B\u4EF6\u5167\u5BB9"), /*#__PURE__*/React.createElement("button", {
+  }, "\u6BCF\u65E5\u73FE\u5834\u7D00\u9304"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "btn btn-outline btn-sm",
     onClick: addContentEntry
@@ -1547,19 +1791,16 @@ function EventCard({
   const info = eventUrgencyInfo(evStart, ev.completedAt);
   const isRange = evStart && evEnd && evStart !== evEnd;
   const periodText = isRange ? `${fmt(evStart)} ～ ${fmt(evEnd)}` : fmt(evStart);
-  const isUrgent = !ev.completedAt && (info.status === 'red' || info.status === 'darkred');
+  const kind = evKind(ev);
+  const isUrgent = !ev.completedAt && kind === 'urgent';
   return /*#__PURE__*/React.createElement("div", {
-    className: `event-page event-page-${info.status}${ev.completedAt ? ' is-done' : ''}${isUrgent ? ' is-urgent' : ''}`,
+    className: `event-page kind-${kind}${ev.completedAt ? ' is-done' : ''}${kind !== 'work' && !ev.completedAt ? ' is-flagged' : ''}`,
     style: {
-      borderWidth: "1px 1px 1px 30px",
-      borderStyle: "solid"
+      '--cat': catColor(ev)
     }
-  }, isUrgent && /*#__PURE__*/React.createElement("img", {
-    className: "event-urgent-stamp",
-    src: (window.__IMG || {}).seal,
-    alt: "\u7DCA\u6025",
-    draggable: "false"
-  }), /*#__PURE__*/React.createElement("div", {
+  }, kind !== 'work' && !ev.completedAt && /*#__PURE__*/React.createElement("span", {
+    className: `event-urgent-stamp kind-${kind}`
+  }, EVENT_KINDS[kind].label), /*#__PURE__*/React.createElement("div", {
     className: "event-page-tab"
   }, /*#__PURE__*/React.createElement("span", {
     className: "event-page-days"
@@ -1581,7 +1822,10 @@ function EventCard({
     users: users
   })), /*#__PURE__*/React.createElement("div", {
     className: "event-page-period"
-  }, "\uD83D\uDCC5 ", periodText), (ev.contentEntries?.length || ev.content) && /*#__PURE__*/React.createElement("div", {
+  }, periodText), /*#__PURE__*/React.createElement(EventDetails, {
+    ev: ev,
+    clamp: true
+  }), (ev.contentEntries?.length || ev.content) && /*#__PURE__*/React.createElement("div", {
     className: "event-content-list"
   }, (ev.contentEntries?.length ? ev.contentEntries : [{
     id: 'legacy',
@@ -1629,12 +1873,21 @@ function MemoCard({
 }) {
   return /*#__PURE__*/React.createElement("div", {
     className: `memo-card${memo.isPinned ? ' memo-pinned' : ''}`
-  }, /*#__PURE__*/React.createElement("img", {
-    src: (window.__IMG || {}).owl,
+  }, /*#__PURE__*/React.createElement("span", {
     className: "memo-owl",
-    alt: "",
-    draggable: "false"
-  }), /*#__PURE__*/React.createElement("div", {
+    "aria-hidden": "true"
+  }, /*#__PURE__*/React.createElement("svg", {
+    width: "18",
+    height: "18",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M9 4h6l-1 6 3 3v2H7v-2l3-3-1-6zM12 15v6"
+  }))), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between gap-2"
   }, /*#__PURE__*/React.createElement("div", {
     onClick: () => onView(memo),
@@ -1651,7 +1904,7 @@ function MemoCard({
     className: "tag-type"
   }, memo.category === '其他' ? memo.customCategory || '其他' : memo.category), memo.date && /*#__PURE__*/React.createElement("span", {
     className: "text-xs text-mute"
-  }, "\uD83D\uDCC5 ", fmt(memo.date))), memo.content && /*#__PURE__*/React.createElement("div", {
+  }, fmt(memo.date))), memo.content && /*#__PURE__*/React.createElement("div", {
     className: "memo-preview mt-1"
   }, memo.content)), /*#__PURE__*/React.createElement("div", {
     className: "flex flex-col gap-1"
@@ -1662,17 +1915,17 @@ function MemoCard({
       borderColor: 'var(--gold-dark)'
     },
     onClick: () => onView(memo)
-  }, "\uD83D\uDC41"), /*#__PURE__*/React.createElement("button", {
+  }, "\u67E5\u770B"), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-outline btn-icon btn-sm",
     style: {
       color: 'var(--gold-dark)',
       borderColor: 'var(--gold-dark)'
     },
     onClick: () => onEdit(memo)
-  }, "\u270E"), canManage && /*#__PURE__*/React.createElement("button", {
+  }, "\u7DE8\u8F2F"), canManage && /*#__PURE__*/React.createElement("button", {
     className: "btn btn-danger btn-icon btn-sm",
     onClick: () => onDelete(memo.id)
-  }, "\uD83D\uDDD1"))));
+  }, "\u522A\u9664"))));
 }
 
 // ── MEMO DETAIL ───────────────────────────────────────────────────────────────
@@ -1742,7 +1995,6 @@ function MemoDetail({
     className: "flex items-center justify-between mb-2"
   }, /*#__PURE__*/React.createElement("h2", {
     style: {
-      fontFamily: "'Cinzel','Noto Serif TC',serif",
       fontSize: '1.05rem',
       color: 'var(--ink-mid)',
       fontWeight: 700
@@ -1765,7 +2017,7 @@ function MemoDetail({
       borderColor: 'var(--border-gold)',
       color: 'var(--ink-mid)'
     }
-  }, "\uD83D\uDCC5 ", fmt(memo.date))), memo.content && /*#__PURE__*/React.createElement("div", {
+  }, fmt(memo.date))), memo.content && /*#__PURE__*/React.createElement("div", {
     style: {
       background: 'rgba(255,248,224,0.5)',
       border: '1px solid var(--border-gold)',
@@ -1844,6 +2096,7 @@ function ProjectDetail({
   onUpdateProject,
   onDeleteProject,
   onSaveEvent,
+  onSaveEvents,
   onDeleteEvent,
   onSaveMemo,
   onDeleteMemo,
@@ -1862,7 +2115,69 @@ function ProjectDetail({
     return new Date(d.getFullYear(), d.getMonth(), 1);
   });
   const [selectedDate, setSelectedDate] = useState(null);
+  const [importResult, setImportResult] = useState(null);
+  const importInputRef = useRef(null);
   const dateRefs = useRef({});
+  const handleImportFile = e => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const wb = XLSX.read(new Uint8Array(reader.result), {
+          type: 'array',
+          cellStyles: true
+        });
+        const res = parseScheduleWorkbook(wb);
+        if (!res.events.length) throw new Error('表裡沒有塗色的施工日');
+        setImportResult(res);
+      } catch (err) {
+        alert(`無法讀取這份工期表：${err.message || err}\n\n需要的格式：每月一個區塊、第一列是日期、每列一個工種、用底色標出施工日。`);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+  const doImport = (list, executorId) => {
+    const stamp = now();
+    const created = list.map(ev => ({
+      id: uid(),
+      projectId: project.id,
+      startDate: ev.startDate,
+      endDate: ev.endDate,
+      date: ev.startDate,
+      title: ev.title,
+      kind: ev.kind,
+      details: ev.details,
+      vendor: '',
+      phone: '',
+      category: ev.category,
+      customCategory: ev.customCategory,
+      executorId,
+      contentEntries: [],
+      content: '',
+      status: 'pending',
+      source: 'schedule-import',
+      createdBy: currentUser.id,
+      updatedBy: currentUser.id,
+      completedBy: null,
+      createdAt: stamp,
+      updatedAt: stamp,
+      completedAt: null
+    }));
+    setImportResult(null);
+    Promise.resolve(onSaveEvents(created)).then(ok => {
+      if (ok === false) {
+        alert('匯入沒有成功：目前無法連上雲端，請確認網路後再匯入一次。');
+        return;
+      }
+      if (created[0]) {
+        const d = parseDateOnly(created[0].startDate);
+        if (d) setCalendarMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+      }
+      showToast(`已匯入 ${created.length} 項工程`);
+    });
+  };
   const showToast = msg => {
     setToast(msg);
     setTimeout(() => setToast(null), 2300);
@@ -1915,7 +2230,9 @@ function ProjectDetail({
   const pinnedMemos = memos;
   const handleSelectCalendarDate = dateKey => {
     setSelectedDate(dateKey);
-    const el = dateRefs.current[dateKey];
+  };
+  const jumpToEvent = ev => {
+    const el = dateRefs.current[ev.startDate || ev.date];
     if (el) el.scrollIntoView({
       behavior: 'smooth',
       block: 'start'
@@ -1945,8 +2262,8 @@ function ProjectDetail({
     const wb = XLSX.utils.book_new();
     const ownName = users.find(u => u.id === project.mainOwnerId)?.name || '';
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['案件名稱', '主要負責人', '狀態', '建立時間', '結案時間'], [project.name, ownName, PROJECT_STATUSES[project.status] || project.status, fmtFull(project.createdAt), fmtFull(project.closedAt)]]), '案件總覽');
-    const evRows = [['開始日期', '結束日期', '事件標題', '工程類型', '執行者', '狀態', '事件內容', '建立者', '修改者', '完成者', '建立時間', '修改時間', '完成時間']];
-    events.forEach(e => evRows.push([fmt(e.startDate || e.date), fmt(e.endDate || e.startDate || e.date), e.title, e.category === '其他' ? e.customCategory : e.category, users.find(u => u.id === e.executorId)?.name || '', e.completedAt ? '已完成' : '未完成', e.content, users.find(u => u.id === e.createdBy)?.name || '', users.find(u => u.id === e.updatedBy)?.name || '', users.find(u => u.id === e.completedBy)?.name || '', fmtFull(e.createdAt), fmtFull(e.updatedAt), fmtFull(e.completedAt)]));
+    const evRows = [['開始日期', '結束日期', '事件標題', '性質', '詳細說明', '廠商／聯絡人', '電話', '工程類型', '執行者', '狀態', '事件內容', '建立者', '修改者', '完成者', '建立時間', '修改時間', '完成時間']];
+    events.forEach(e => evRows.push([fmt(e.startDate || e.date), fmt(e.endDate || e.startDate || e.date), e.title, EVENT_KINDS[evKind(e)].label, e.details || '', e.vendor || '', e.phone || '', e.category === '其他' ? e.customCategory : e.category, users.find(u => u.id === e.executorId)?.name || '', e.completedAt ? '已完成' : '未完成', e.content, users.find(u => u.id === e.createdBy)?.name || '', users.find(u => u.id === e.updatedBy)?.name || '', users.find(u => u.id === e.completedBy)?.name || '', fmtFull(e.createdAt), fmtFull(e.updatedAt), fmtFull(e.completedAt)]));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(evRows), '事件清單');
     const memoRows = [['日期', '主旨', '工程類型', '是否置頂', '注意事項內容', '建立者', '修改者', '建立時間', '修改時間']];
     memos.forEach(m => memoRows.push([fmt(m.date), m.title, m.category === '其他' ? m.customCategory : m.category, m.isPinned ? '是' : '否', m.content, users.find(u => u.id === m.createdBy)?.name || '', users.find(u => u.id === m.updatedBy)?.name || '', fmtFull(m.createdAt), fmtFull(m.updatedAt)]));
@@ -2031,7 +2348,7 @@ function ProjectDetail({
   }, /*#__PURE__*/React.createElement("div", {
     className: "spine-plate",
     style: {
-      background: `linear-gradient(160deg, ${h.primary}, ${h.primaryDeep})`
+      '--bar': h.primary
     }
   }, /*#__PURE__*/React.createElement("span", {
     className: "spine-hub top"
@@ -2041,8 +2358,8 @@ function ProjectDetail({
     className: "spine-emblem"
   }, /*#__PURE__*/React.createElement(HouseEmblem, {
     house: h.emblem,
-    color: h.metal,
-    size: 60
+    name: owner && owner.name,
+    size: 52
   })), /*#__PURE__*/React.createElement("div", {
     className: "spine-inner"
   }, /*#__PURE__*/React.createElement("div", {
@@ -2074,9 +2391,6 @@ function ProjectDetail({
     className: "status-row"
   }, /*#__PURE__*/React.createElement("span", {
     className: `pill ${statusClass('closed')}`,
-    style: {
-      color: '#efe6d2'
-    }
   }, PROJECT_STATUSES.closed))))), /*#__PURE__*/React.createElement("div", {
     className: "page page-enter",
     style: {
@@ -2084,13 +2398,55 @@ function ProjectDetail({
       paddingTop: '0.85rem'
     }
   }, /*#__PURE__*/React.createElement("div", {
-    className: "section-heading"
-  }, "\u65E5\u671F\u8868"), /*#__PURE__*/React.createElement(MagicCalendar, {
+    className: "section-heading with-action"
+  }, /*#__PURE__*/React.createElement("span", null, "\u65E5\u671F\u8868"), project.status !== 'closed' && /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-outline btn-sm",
+    onClick: () => importInputRef.current && importInputRef.current.click()
+  }, "\u532F\u5165\u5DE5\u671F\u8868"), /*#__PURE__*/React.createElement("input", {
+    ref: importInputRef,
+    type: "file",
+    accept: ".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    style: {
+      display: 'none'
+    },
+    onChange: handleImportFile
+  })), importResult && /*#__PURE__*/React.createElement(ScheduleImport, {
+    result: importResult,
+    existing: events,
+    users: users,
+    currentUser: currentUser,
+    onCancel: () => setImportResult(null),
+    onImport: doImport
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "cal-wrap"
+  }, /*#__PURE__*/React.createElement(MagicCalendar, {
     calendarMonth: calendarMonth,
     setCalendarMonth: setCalendarMonth,
     calendarMap: calendarMap,
-    onSelectDate: handleSelectCalendarDate
-  }), selectedDate && calendarMap[selectedDate] && /*#__PURE__*/React.createElement("div", {
+    onSelectDate: handleSelectCalendarDate,
+    selectedDate: selectedDate
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "cal-legend"
+  }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("i", {
+    className: "lg-bar"
+  }), "\u65BD\u5DE5\u671F\u9593\uFF08\u984F\u8272\uFF1D\u5DE5\u7A2E\uFF09"), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("i", {
+    className: "cal-flag urgent"
+  }, "\u7DCA\u6025")), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("i", {
+    className: "cal-flag sched"
+  }, "\u9810\u5B9A")), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("i", {
+    className: "cal-flag memo"
+  }, "\u6CE8\u610F")), /*#__PURE__*/React.createElement("span", null, "\u9EDE\u65E5\u671F\u770B\u7576\u5929\u5168\u90E8"))), selectedDate && /*#__PURE__*/React.createElement(DaySheet, {
+    dateKey: selectedDate,
+    dayData: calendarMap[selectedDate],
+    users: users,
+    canEdit: project.status !== 'closed',
+    onClose: () => setSelectedDate(null),
+    onView: ev => {
+      setSelectedDate(null);
+      setShowEventDetail(ev);
+    },
+    onComplete: handleComplete
+  }), false && /*#__PURE__*/React.createElement("div", {
     className: "selected-date-panel"
   }, /*#__PURE__*/React.createElement("div", {
     className: "section-heading gold-on-parch",
@@ -2155,7 +2511,7 @@ function ProjectDetail({
     ref: el => dateRefs.current[date] = el
   }, /*#__PURE__*/React.createElement("div", {
     className: "date-label"
-  }, "\uD83D\uDCC5 ", date.replace(/-/g, '/')), (timelineMap[date].events || []).map(ev => /*#__PURE__*/React.createElement(EventCard, {
+  }, date.replace(/-/g, '/')), (timelineMap[date].events || []).map(ev => /*#__PURE__*/React.createElement(EventCard, {
     key: ev.id,
     ev: ev,
     users: users,
@@ -2207,7 +2563,6 @@ function ProjectDetail({
     onClose: () => setShowEventDetail(null)
   }, /*#__PURE__*/React.createElement("h2", {
     style: {
-      fontFamily: "'Cinzel','Noto Serif TC',serif",
       fontSize: '1.05rem',
       color: 'var(--ink-mid)',
       marginBottom: '0.75rem',
@@ -2220,7 +2575,9 @@ function ProjectDetail({
   }, showEventDetail.category === '其他' ? showEventDetail.customCategory || '其他' : showEventDetail.category), showEventDetail.executorId && /*#__PURE__*/React.createElement(UserBadge, {
     userId: showEventDetail.executorId,
     users: users
-  })), (showEventDetail.contentEntries?.length || showEventDetail.content) && /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement(EventDetails, {
+    ev: showEventDetail
+  }), (showEventDetail.contentEntries?.length || showEventDetail.content) && /*#__PURE__*/React.createElement("div", {
     className: "event-content-list event-content-list-detail"
   }, (showEventDetail.contentEntries?.length ? showEventDetail.contentEntries : [{
     id: 'legacy',
@@ -2483,6 +2840,18 @@ function App() {
   const handleDeleteEvent = id => {
     saveEvents(events.filter(e => e.id !== id));
   };
+  const handleSaveEvents = list => {
+    if (!list.length) return Promise.resolve(true);
+    const p = projects.find(x => x.id === list[0].projectId);
+    return saveEvents([...events, ...list]).then(ok => {
+      if (ok && p) handleUpdateProject({
+        ...p,
+        updatedAt: now(),
+        updatedBy: currentUser.id
+      });
+      return ok;
+    });
+  };
   const handleSaveMemo = m => {
     const next = memos.find(x => x.id === m.id) ? memos.map(x => x.id === m.id ? m : x) : [...memos, m];
     saveMemos(next);
@@ -2520,6 +2889,7 @@ function App() {
       onUpdateProject: handleUpdateProject,
       onDeleteProject: handleDeleteProject,
       onSaveEvent: handleSaveEvent,
+      onSaveEvents: handleSaveEvents,
       onDeleteEvent: handleDeleteEvent,
       onSaveMemo: handleSaveMemo,
       onDeleteMemo: handleDeleteMemo,
