@@ -2167,10 +2167,7 @@ function ProjectDetail({
     }));
     setImportResult(null);
     Promise.resolve(onSaveEvents(created)).then(ok => {
-      if (ok === false) {
-        alert('匯入沒有成功：目前無法連上雲端，請確認網路後再匯入一次。');
-        return;
-      }
+      if (ok === false) return;
       if (created[0]) {
         const d = parseDateOnly(created[0].startDate);
         if (d) setCalendarMonth(new Date(d.getFullYear(), d.getMonth(), 1));
@@ -2248,13 +2245,17 @@ function ProjectDetail({
       updatedAt: now()
     };
     onSaveEvent(updated);
-    showToast(ev.completedAt ? '已取消完成' : '已標記完成 ✦');
+    showToast(ev.completedAt ? '已取消完成' : '已標記完成');
   };
   const handleDeleteEvent = id => {
+    const ev = events.find(e => e.id === id);
+    if (!confirm(`確定要刪除「${ev ? ev.title : '這個事件'}」？刪除後無法復原。`)) return;
     onDeleteEvent(id);
     showToast('事件已刪除');
   };
   const handleDeleteMemo = id => {
+    const m = memos.find(x => x.id === id);
+    if (!confirm(`確定要刪除注意事項「${m ? m.title : ''}」？刪除後無法復原。`)) return;
     onDeleteMemo(id);
     showToast('注意事項已刪除');
   };
@@ -2295,7 +2296,7 @@ function ProjectDetail({
       console.warn('Excel 匯出失敗', e);
     }
     setShowCloseConfirm(false);
-    showToast('案件已封存並匯出 Excel ✦');
+    showToast('案件已封存並匯出 Excel');
     setTimeout(() => onBack(), 900);
   };
   const owner = users.find(u => u.id === project.mainOwnerId);
@@ -2650,7 +2651,7 @@ function ProjectDetail({
   }, /*#__PURE__*/React.createElement("button", {
     className: "btn btn-gold btn-full",
     onClick: () => handleCloseProject()
-  }, "\uD83D\uDCE6 \u5C01\u5B58\u4E26\u532F\u51FA"), /*#__PURE__*/React.createElement("button", {
+  }, "\u5C01\u5B58\u4E26\u532F\u51FA"), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-outline btn-full",
     onClick: () => setShowCloseConfirm(false)
   }, "\u53D6\u6D88")))), toast && /*#__PURE__*/React.createElement(Toast, {
@@ -2791,6 +2792,7 @@ function App() {
       setter(prev);
       db.set(cacheName, prev);
       setConn('offline');
+      alert('沒有存到：目前連不上雲端，剛才的修改已還原。\n請確認網路後再操作一次。');
     }
     return ok;
   };
